@@ -9,3 +9,6 @@ uvicorn
 streamlit
 shap
 mlflow
+pydantic
+requests
+plotly
