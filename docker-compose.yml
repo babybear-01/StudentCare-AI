@@ -1,24 +1,37 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  # 1. ตัว Backend (FastAPI)
-  api:
+
+  mlflow-ui:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow-ui
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    command: mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root /app/mlruns --host 0.0.0.0
+
+  studentcare-api:
     build: .
-    image: educare_api_image:latest
-    container_name: educare_api_v2
-    command: uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+    container_name: studentcare-api
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    command: uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 
-  # 2. ตัว Frontend (Streamlit)
-  frontend:
+  studentcare-frontend:
     build: .
-    image: educare_frontend_image:latest
-    container_name: educare_frontend_v2
-    command: streamlit run src/frontend/app.py --server.port 8501 --server.address 0.0.0.0
+    container_name: studentcare-frontend
     ports:
       - "8501:8501"
-    depends_on:
-      - api
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+    command: streamlit run src/frontend/app.py --server.port 8501 --server.address 0.0.0.0
