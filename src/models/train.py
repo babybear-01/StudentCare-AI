@@ -28,6 +28,8 @@ import mlflow.sklearn
 
 from src.data.preprocess import load_combined_dataset, make_label, split_xy
 
+import mlflow
+
 # =====================================
 # CONFIG
 # =====================================
@@ -69,6 +71,8 @@ def prepare_data(
         y_val=np.asarray(y_val),
     )
 
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
+mlflow.set_experiment("Student_Risk_Prediction")
 
 def build_pipeline(X_sample: pd.DataFrame) -> Pipeline:
     """สร้างท่อส่งข้อมูล (Pipeline) รวม Preprocessing และ Model"""

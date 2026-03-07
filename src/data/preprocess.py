@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+# ชี้ไปที่โฟลเดอร์ data/processed
+DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
 
 
 def load_dataset(name: str) -> pd.DataFrame:
     """
-    Load a single dataset from the data directory.
+    Load a single dataset from the processed data directory.
     """
     path = DATA_DIR / name
 
@@ -21,11 +22,11 @@ def load_dataset(name: str) -> pd.DataFrame:
 
 def load_combined_dataset() -> pd.DataFrame:
     """
-    Load student-mat.csv and student-por.csv, then combine them
+    Load student-mat-id.csv and student-por-id.csv, then combine them
     into a single dataset for one-time training.
     """
-    df_mat = load_dataset("student-mat.csv")
-    df_por = load_dataset("student-por.csv")
+    df_mat = load_dataset("student-mat-id.csv")
+    df_por = load_dataset("student-por-id.csv")
 
     # Add source/course column
     df_mat = df_mat.copy()
@@ -57,9 +58,9 @@ def make_label(df: pd.DataFrame, pass_threshold: int = 10) -> pd.DataFrame:
 def split_xy(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     """
     Split dataframe into features (X) and target (y).
-    Remove G1, G2, G3, and risk from input features.
+    Remove G1, G2, G3, risk, and student_id from input features.
     """
-    drop_cols = [c for c in ["G1", "G2", "G3", "risk"] if c in df.columns]
+    drop_cols = [c for c in ["G1", "G2", "G3", "risk", "student_id"] if c in df.columns]
 
     X = df.drop(columns=drop_cols)
     y = df["risk"]
