@@ -11,7 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 
 # 1. โหลดข้อมูล
-df = pd.read_csv(r"C:\Ject_MLOps\StudentCare-AI\data\processed\process_for_modelv2\matv2.csv")
+df = pd.read_csv(r"C:\Ject_MLOps\StudentCare-AI\data\processed\process_for_modelv2\porv2.csv")
 
 # 2. เลือก Features (รวมทั้งวิชาการและสภาพแวดล้อม)
 features = [
@@ -35,12 +35,12 @@ X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
 # 5. กำหนดค่าสำหรับ Save Model ลงเครื่อง
-MODEL_DIR = "StudentCare-AI\src\modelv2\Weight_feature_mat_2"
+MODEL_DIR = "StudentCare-AI\src\modelv2\Weight_feature_por_2"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # 6. ตั้งค่า MLflow และรันการเทรน
 mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment("Weight_feature_mat_v2")
+mlflow.set_experiment("Weight_feature_por_v2")
 
 with mlflow.start_run():
     # เทรนโมเดล
