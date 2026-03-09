@@ -206,8 +206,25 @@ POR_STEP1_MODEL_PATH = (
 )
 
 # Step 2B models (predict risk label)
-MATH_STEP2_MODEL_PATH = PROJECT_ROOT / "src" / "models" / "math_step2_risk_model.pkl"
-POR_STEP2_MODEL_PATH = PROJECT_ROOT / "src" / "models" / "por_step2_risk_model.pkl"
+MATH_STEP2_MODEL_PATH = (
+    PROJECT_ROOT
+    / "src"
+    / "modelv2"
+    / "StudentCare-AI"
+    / "src"
+    / "models"
+    / "math_step2_risk_model_v3.pkl"
+)
+
+POR_STEP2_MODEL_PATH = (
+    PROJECT_ROOT
+    / "src"
+    / "modelv2"
+    / "StudentCare-AI"
+    / "src"
+    / "models"
+    / "por_step2_risk_model_v3.pkl"
+)
 
 # ==========================================
 # 4) FEATURES
@@ -518,14 +535,14 @@ def predict_single(student_data: dict, subject: str):
     }
 
 
-def predict_batch(df: pd.DataFrame):
+def predict_batch(df: pd.DataFrame, default_subject: str = "math"):
     df = df.copy()
     results = []
 
     for _, row in df.iterrows():
-        subject = row.get("course", "math")
+        subject = row.get("course", default_subject)
         if subject not in ["math", "por"]:
-            subject = "math"
+            subject = default_subject
 
         student_data = {}
         for col in STEP1_FEATURES:
@@ -824,7 +841,7 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
             st.error(f"ไฟล์ขาดคอลัมน์: {missing}")
         else:
             if st.button("🚀 เริ่มวิเคราะห์", use_container_width=True):
-                result_df = predict_batch(df)
+                result_df = predict_batch(df, default_subject=default_subject)
 
                 st.divider()
                 st.subheader("สรุปผล")

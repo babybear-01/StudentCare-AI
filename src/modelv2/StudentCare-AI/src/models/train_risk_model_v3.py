@@ -27,7 +27,7 @@ CURRENT_FILE = Path(__file__).resolve()
 
 BASE_DIR = None
 for parent in CURRENT_FILE.parents:
-    if (parent / "data").exists() and (parent / "src").exists() and (parent / "assets").exists():
+    if (parent / "data").exists() and (parent / "src").exists():
         BASE_DIR = parent
         break
 
@@ -54,6 +54,13 @@ STEP1_MODEL_PATHS = {
 
 
 # ==========================================
+# FINAL STEP 2 MODEL SAVE DIR
+# save ไปที่โฟลเดอร์เดียวกับ train_risk_model_v3.py
+# ==========================================
+FINAL_MODEL_DIR = CURRENT_FILE.parent
+
+
+# ==========================================
 # MLFLOW CONFIG
 # ==========================================
 MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
@@ -61,7 +68,7 @@ MLFLOW_EXPERIMENT_NAME = "studentcare-step2-risk-model"
 
 
 # ==========================================
-# STEP 1 FEATURES (USE FRIEND'S MODEL)
+# STEP 1 FEATURES
 # ==========================================
 STEP1_FEATURES = [
     "G1",
@@ -83,7 +90,7 @@ STEP1_FEATURES = [
 
 
 # ==========================================
-# STEP 2B FEATURES (8 CORE FEATURES)
+# STEP 2B FEATURES
 # ==========================================
 STEP2_FEATURES = [
     "G1",
@@ -136,7 +143,7 @@ def preprocess_step1_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ==========================================
-# STEP 1: ADD PREDICTED G3 FROM FRIEND'S MODEL
+# STEP 1: ADD PREDICTED G3
 # ==========================================
 def add_predicted_g3(df: pd.DataFrame, subject_name: str) -> pd.DataFrame:
     df = df.copy()
@@ -154,7 +161,7 @@ def add_predicted_g3(df: pd.DataFrame, subject_name: str) -> pd.DataFrame:
 
 
 # ==========================================
-# STEP 2A: LOGIC FOR EXPLANATION
+# STEP 2A: RISK ZONE
 # ==========================================
 def create_risk_zone_from_predicted_g3(predicted_g3: float) -> str:
     if predicted_g3 < 10:
@@ -176,25 +183,19 @@ def create_risk_label_from_g3(g3: float) -> str:
 
 
 # ==========================================
-# PREPARE DATASET FOR STEP 2B
+# PREPARE DATASET
 # ==========================================
 def prepare_dataset(df: pd.DataFrame, subject_name: str):
     df = df.copy()
 
-    # Step 1: คำนวณ predicted_g3
     df = add_predicted_g3(df, subject_name=subject_name)
-
-    # Step 2A logic
     df["risk_zone"] = df["predicted_g3"].apply(create_risk_zone_from_predicted_g3)
-
-    # Step 2B target
     df["risk_label"] = df["G3"].apply(create_risk_label_from_g3)
 
     missing_step2_cols = [col for col in STEP2_FEATURES if col not in df.columns]
     if missing_step2_cols:
         raise ValueError(f"Missing required columns for Step 2B: {missing_step2_cols}")
 
-    # ดึงเฉพาะ 8 ฟีเจอร์ที่ระบุใน STEP2_FEATURES
     X = df[STEP2_FEATURES].copy()
     y = df["risk_label"].copy()
 
@@ -202,7 +203,7 @@ def prepare_dataset(df: pd.DataFrame, subject_name: str):
 
 
 # ==========================================
-# BUILD STEP 2B PIPELINE
+# BUILD PIPELINE
 # ==========================================
 def build_pipeline(features):
     numeric_transformer = Pipeline(
@@ -216,7 +217,7 @@ def build_pipeline(features):
         transformers=[
             ("num", numeric_transformer, features),
         ],
-        remainder='drop'  # ทิ้งคอลัมน์อื่นที่ไม่ได้ระบุไว้ ป้องกันฟีเจอร์หลุดรอด
+        remainder="drop",
     )
 
     classifier = RandomForestClassifier(
@@ -270,6 +271,8 @@ def train_one_subject(subject_name: str, data_path: Path):
     print(f"STEP 2B TRAINING SUBJECT : {subject_name}")
     print("=" * 70)
     print(f"DATA_PATH : {data_path}")
+    print(f"STEP1 MODEL PATH : {STEP1_MODEL_PATHS[subject_name]}")
+    print(f"FINAL SAVE DIR   : {FINAL_MODEL_DIR}")
 
     df = load_data(data_path)
     X, y, features, prepared_df = prepare_dataset(df, subject_name)
@@ -313,7 +316,6 @@ def train_one_subject(subject_name: str, data_path: Path):
 
         pipeline.fit(X_train, y_train)
         y_pred = pipeline.predict(X_test)
-        y_proba = pipeline.predict_proba(X_test)
 
         acc = accuracy_score(y_test, y_pred)
         macro_f1 = f1_score(y_test, y_pred, average="macro")
@@ -332,8 +334,8 @@ def train_one_subject(subject_name: str, data_path: Path):
         mlflow.log_metric("weighted_f1", float(weighted_f1))
 
         print("\n===== STEP 2B EVALUATION =====")
-        print("Accuracy     :", round(acc, 4))
-        print("Macro F1     :", round(macro_f1, 4))
+        print("Accuracy    :", round(acc, 4))
+        print("Macro F1    :", round(macro_f1, 4))
         print("Weighted F1 :", round(weighted_f1, 4))
         print("\nClassification Report:")
         print(report_text)
@@ -378,10 +380,7 @@ def train_one_subject(subject_name: str, data_path: Path):
 
             fi_plot_path = tmpdir / f"{subject_name}_feature_importance.png"
             plt.figure(figsize=(8, 5))
-            plt.bar(
-                feature_importance_df["feature"],
-                feature_importance_df["importance"],
-            )
+            plt.bar(feature_importance_df["feature"], feature_importance_df["importance"])
             plt.title(f"Feature Importances ({subject_name})")
             plt.xlabel("Feature")
             plt.ylabel("Importance")
@@ -391,21 +390,18 @@ def train_one_subject(subject_name: str, data_path: Path):
             plt.close()
             mlflow.log_artifact(str(fi_plot_path))
 
-        model_path = BASE_DIR / "src" / "models" / f"{subject_name}_step2_risk_model.pkl"
-        model_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(pipeline, model_path)
+        FINAL_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        final_model_path = FINAL_MODEL_DIR / f"{subject_name}_step2_risk_model_v3.pkl"
+        joblib.dump(pipeline, final_model_path)
 
-        print(f"\nSaved model to: {model_path}")
+        print(f"\n[SUCCESS] Saved model to: {final_model_path}")
         print(f"Run logged to MLflow: {subject_name}_step2_risk_model")
 
 
 # ==========================================
-# MAIN TRAIN
+# MAIN
 # ==========================================
-def train():
-    print("STEP 1 + STEP 2B RISK MODEL TRAINING STARTED")
-    print("=" * 70)
-
+if __name__ == "__main__":
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
@@ -414,7 +410,3 @@ def train():
 
     print("\n" + "=" * 70)
     print("All Step 1 + Step 2B training finished and logged to MLflow.")
-
-
-if __name__ == "__main__":
-    train()
