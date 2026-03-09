@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import joblib
+import numpy as np
 from pathlib import Path
 
 # ==========================================
@@ -108,6 +109,49 @@ st.markdown(
         margin-top: -0.2rem;
     }
 
+    .factor-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+    }
+
+    .factor-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #f8fafc;
+        margin-bottom: 4px;
+    }
+
+    .factor-divider {
+        color: #94a3b8;
+        font-family: monospace;
+        margin-bottom: 14px;
+        letter-spacing: 0.5px;
+    }
+
+    .factor-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 1rem;
+        margin-bottom: 10px;
+        color: #e2e8f0;
+        line-height: 1.5;
+    }
+
+    .factor-icon {
+        font-size: 1.05rem;
+        line-height: 1.3;
+    }
+
+    .factor-empty {
+        color: #bbf7d0;
+        font-size: 0.98rem;
+        line-height: 1.6;
+    }
+
     div[data-testid="stForm"] {
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 20px;
@@ -209,7 +253,26 @@ CLASS_MAP = {
 }
 
 # ==========================================
-# 6) LOAD MODELS
+# 6) STEP 1 DEFAULTS
+# ==========================================
+STEP1_DEFAULTS = {
+    "studytime": 2,
+    "failures": 0,
+    "absences": 0,
+    "Medu": 2,
+    "Fedu": 2,
+    "famrel": 3,
+    "freetime": 3,
+    "goout": 3,
+    "nursery": 1,
+    "internet": 1,
+    "romantic": 0,
+    "Dalc": 1,
+    "Walc": 1,
+}
+
+# ==========================================
+# 7) LOAD MODELS
 # ==========================================
 @st.cache_resource
 def load_step1_model(subject: str):
@@ -240,10 +303,15 @@ def load_step2_model(subject: str):
 
     raise ValueError("subject must be 'math' or 'por'")
 
+# ==========================================
+# 8) BUSINESS LOGIC
+# ==========================================
+def normalize_optional_value(value):
+    if value == "-" or value == "":
+        return np.nan
+    return value
 
-# ==========================================
-# 7) BUSINESS LOGIC
-# ==========================================
+
 def classify_g3(predicted_g3: float) -> str:
     if predicted_g3 < 10:
         return "Academic Risk"
@@ -261,35 +329,147 @@ def create_risk_zone(predicted_g3: float) -> str:
 
 
 def preprocess_step1_input(student_data: dict) -> dict:
-    processed = student_data.copy()
+    processed = {}
+
+    for key, value in student_data.items():
+        processed[key] = normalize_optional_value(value)
+
     binary_map = {"yes": 1, "no": 0, 1: 1, 0: 0}
 
     for col in ["nursery", "internet", "romantic"]:
-        if col in processed:
+        if col in processed and not pd.isna(processed[col]):
             processed[col] = binary_map.get(processed[col], processed[col])
 
     return processed
 
 
-def get_risk_badge(label: str) -> str:
-    if label == "High Risk":
-        return "🔴 High Risk"
-    if label == "Medium Risk":
-        return "🟠 Medium Risk"
-    if label == "Low Risk":
-        return "🟢 Low Risk"
-    return str(label)
+def prepare_step1_input(student_data: dict) -> pd.DataFrame:
+    step1_input = preprocess_step1_input(student_data)
+    row = []
+
+    for col in STEP1_FEATURES:
+        val = step1_input.get(col, np.nan)
+
+        if pd.isna(val):
+            val = STEP1_DEFAULTS.get(col, 0)
+
+        row.append(val)
+
+    return pd.DataFrame([row], columns=STEP1_FEATURES)
+
+
+def prepare_step2_input(student_data: dict) -> pd.DataFrame:
+    row = []
+
+    for col in STEP2_FEATURES:
+        val = student_data.get(col, np.nan)
+        val = normalize_optional_value(val)
+        row.append(val)
+
+    return pd.DataFrame([row], columns=STEP2_FEATURES)
+
+
+def get_top_risk_factors(student_data: dict):
+    factors = []
+
+    g1 = student_data.get("G1", np.nan)
+    g2 = student_data.get("G2", np.nan)
+    failures = normalize_optional_value(student_data.get("failures", np.nan))
+    absences = normalize_optional_value(student_data.get("absences", np.nan))
+    studytime = normalize_optional_value(student_data.get("studytime", np.nan))
+    goout = normalize_optional_value(student_data.get("goout", np.nan))
+    medu = normalize_optional_value(student_data.get("Medu", np.nan))
+    walc = normalize_optional_value(student_data.get("Walc", np.nan))
+
+    if not pd.isna(g2):
+        if g2 < 10:
+            factors.append(("🔴", "G2 ต่ำ", 4))
+        elif g2 < 12:
+            factors.append(("🟠", "G2 ค่อนข้างต่ำ", 3))
+
+    if not pd.isna(absences):
+        if absences >= 10:
+            factors.append(("🟠", "ขาดเรียนสูง", 3))
+        elif absences >= 5:
+            factors.append(("🟡", "ขาดเรียนระดับปานกลาง", 2))
+
+    if not pd.isna(studytime):
+        if studytime == 1:
+            factors.append(("🟡", "เวลาเรียนต่ำ", 2))
+        elif studytime == 2:
+            factors.append(("🟡", "เวลาเรียนปานกลาง", 1))
+
+    if not pd.isna(failures):
+        if failures >= 2:
+            factors.append(("🔴", "มีประวัติสอบตกหลายครั้ง", 4))
+        elif failures == 1:
+            factors.append(("🟠", "มีประวัติสอบตก", 3))
+
+    if not pd.isna(g1):
+        if g1 < 10:
+            factors.append(("🟠", "G1 ต่ำ", 3))
+        elif g1 < 12:
+            factors.append(("🟡", "G1 ค่อนข้างต่ำ", 2))
+
+    if not pd.isna(goout):
+        if goout >= 4:
+            factors.append(("🟡", "ออกไปเที่ยวบ่อย", 1))
+
+    if not pd.isna(medu):
+        if medu == 0:
+            factors.append(("🟡", "การศึกษาของแม่ต่ำมาก", 1))
+        elif medu == 1:
+            factors.append(("🟡", "การศึกษาของแม่ค่อนข้างต่ำ", 1))
+
+    if not pd.isna(walc):
+        if walc >= 4:
+            factors.append(("🟡", "การดื่มวันหยุดค่อนข้างสูง", 1))
+
+    factors = sorted(factors, key=lambda x: x[2], reverse=True)
+    return factors[:3]
+
+
+def render_top_risk_factors_ai_style(student_data: dict):
+    st.markdown("### 🔎 Top Risk Factors")
+
+    top_factors = get_top_risk_factors(student_data)
+
+    if len(top_factors) > 0:
+        factor_lines = ""
+        for icon, label, _ in top_factors:
+            factor_lines += f"""
+<div class="factor-item">
+    <span class="factor-icon">{icon}</span>
+    <span>{label}</span>
+</div>
+"""
+
+        card_html = f"""
+<div class="factor-card">
+    <div class="factor-title">Top Risk Factors</div>
+    <div class="factor-divider">━━━━━━━━━━━━━━━━━━</div>
+    {factor_lines}
+</div>
+"""
+        st.markdown(card_html, unsafe_allow_html=True)
+
+    else:
+        st.markdown(
+            """
+<div class="factor-card">
+    <div class="factor-title">Top Risk Factors</div>
+    <div class="factor-divider">━━━━━━━━━━━━━━━━━━</div>
+    <div class="factor-empty">🟢 ไม่พบปัจจัยเสี่ยงเด่นชัดจากข้อมูลที่กรอก</div>
+</div>
+""",
+            unsafe_allow_html=True
+        )
 
 
 def predict_single(student_data: dict, subject: str):
     # ---------- STEP 1 ----------
     step1_model = load_step1_model(subject)
-    step1_input = preprocess_step1_input(student_data)
-
-    step1_df = pd.DataFrame(
-        [[step1_input[col] for col in STEP1_FEATURES]],
-        columns=STEP1_FEATURES
-    )
+    step1_df = prepare_step1_input(student_data)
 
     predicted_g3 = float(step1_model.predict(step1_df)[0])
     academic_status = classify_g3(predicted_g3)
@@ -297,25 +477,36 @@ def predict_single(student_data: dict, subject: str):
 
     # ---------- STEP 2B ----------
     step2_model = load_step2_model(subject)
+    step2_df = prepare_step2_input(student_data)
 
-    step2_df = pd.DataFrame(
-        [[student_data[col] for col in STEP2_FEATURES]],
-        columns=STEP2_FEATURES
-    )
+    raw_pred = step2_model.predict(step2_df)[0]
 
-    raw_label = int(step2_model.predict(step2_df)[0])
-    risk_label = CLASS_MAP.get(raw_label, "Unknown")
+    if isinstance(raw_pred, str):
+        risk_label = raw_pred
+    else:
+        try:
+            risk_label = CLASS_MAP.get(int(raw_pred), str(raw_pred))
+        except Exception:
+            risk_label = str(raw_pred)
 
     risk_probabilities = None
     if hasattr(step2_model, "predict_proba"):
         probs = step2_model.predict_proba(step2_df)[0]
-        classifier = step2_model.named_steps["classifier"]
-        raw_classes = classifier.classes_
 
-        risk_probabilities = {
-            CLASS_MAP.get(int(cls), str(cls)): float(prob)
-            for cls, prob in zip(raw_classes, probs)
-        }
+        try:
+            if hasattr(step2_model, "named_steps") and "classifier" in step2_model.named_steps:
+                raw_classes = step2_model.named_steps["classifier"].classes_
+            else:
+                raw_classes = step2_model.classes_
+
+            risk_probabilities = {}
+            for cls, prob in zip(raw_classes, probs):
+                if isinstance(cls, str):
+                    risk_probabilities[cls] = float(prob)
+                else:
+                    risk_probabilities[CLASS_MAP.get(int(cls), str(cls))] = float(prob)
+        except Exception:
+            risk_probabilities = None
 
     return {
         "subject": subject,
@@ -328,6 +519,7 @@ def predict_single(student_data: dict, subject: str):
 
 
 def predict_batch(df: pd.DataFrame):
+    df = df.copy()
     results = []
 
     for _, row in df.iterrows():
@@ -335,7 +527,13 @@ def predict_batch(df: pd.DataFrame):
         if subject not in ["math", "por"]:
             subject = "math"
 
-        student_data = {col: row[col] for col in STEP1_FEATURES}
+        student_data = {}
+        for col in STEP1_FEATURES:
+            value = row[col] if col in row else np.nan
+            if pd.isna(value):
+                value = np.nan
+            student_data[col] = value
+
         result = predict_single(student_data, subject)
 
         prob_high = None
@@ -361,9 +559,8 @@ def predict_batch(df: pd.DataFrame):
     result_df = result_df.loc[:, ~result_df.columns.duplicated()]
     return result_df
 
-
 # ==========================================
-# 8) SIDEBAR
+# 9) SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("🎓 StudentCare-AI")
@@ -378,9 +575,8 @@ with st.sidebar:
     st.divider()
     st.caption("KMITL Student Project")
 
-
 # ==========================================
-# 9) INDIVIDUAL MODE
+# 10) INDIVIDUAL MODE
 # ==========================================
 if app_mode == "👤 วิเคราะห์รายบุคคล":
     st.markdown(
@@ -395,43 +591,102 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         unsafe_allow_html=True
     )
 
+    st.error(
+        """
+⚠️ **คำแนะนำในการกรอกข้อมูล**
+
+หากเลือกค่า **"-" (ไม่ทราบข้อมูล)** อาจทำให้ **ผลการทำนายมีความแม่นยำน้อยลง**
+เพื่อให้ AI วิเคราะห์ได้ดีที่สุด ควรกรอกข้อมูลให้ครบมากที่สุด
+        """
+    )
+
     with st.form("individual_form"):
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">📘 ข้อมูลวิชาและผลการเรียน</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📌 ข้อมูลที่จำเป็น</div>', unsafe_allow_html=True)
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         subject = c1.selectbox("เลือกรายวิชา", ["math", "por"])
-        G1 = c2.number_input("G1", min_value=0.0, max_value=20.0, value=10.0)
-        G2 = c3.number_input("G2", min_value=0.0, max_value=20.0, value=10.0)
+        G1 = c2.number_input("คะแนนสอบช่วงที่ 1 (0-20)", min_value=0.0, max_value=20.0, value=10.0)
+        G2 = c3.number_input("คะแนนสอบช่วงที่ 2 (0-20)", min_value=0.0, max_value=20.0, value=10.0)
+        absences = c4.number_input("จำนวนครั้งที่ขาดเรียน", min_value=0, max_value=93, value=0)
 
-        c4, c5, c6 = st.columns(3)
-        studytime = c4.selectbox("studytime (1-4)", [1, 2, 3, 4], index=1)
-        failures = c5.number_input("failures", min_value=0, max_value=4, value=0)
-        absences = c6.number_input("absences", min_value=0, max_value=93, value=0)
+        failures = st.selectbox("จำนวนครั้งที่สอบตกในอดีต", [0, 1, 2, 3, 4], index=0)
+
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">👨‍👩‍👧 ปัจจัยครอบครัวและพฤติกรรม</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🔍 ข้อมูลเพิ่มเติม (เลือก "-" ได้ถ้าไม่ทราบ)</div>', unsafe_allow_html=True)
 
-        c7, c8, c9 = st.columns(3)
-        Medu = c7.selectbox("Medu (0-4)", [0, 1, 2, 3, 4], index=2)
-        Fedu = c8.selectbox("Fedu (0-4)", [0, 1, 2, 3, 4], index=2)
-        famrel = c9.selectbox("famrel (1-5)", [1, 2, 3, 4, 5], index=3)
+        c5, c6, c7 = st.columns(3)
 
-        c10, c11, c12 = st.columns(3)
-        freetime = c10.selectbox("freetime (1-5)", [1, 2, 3, 4, 5], index=2)
-        goout = c11.selectbox("goout (1-5)", [1, 2, 3, 4, 5], index=1)
-        Dalc = c12.selectbox("Dalc (1-5)", [1, 2, 3, 4, 5], index=0)
+        study_options = {
+            "-": "-",
+            1: "น้อยกว่า 2 ชั่วโมง/สัปดาห์",
+            2: "2-5 ชั่วโมง/สัปดาห์",
+            3: "5-10 ชั่วโมง/สัปดาห์",
+            4: "มากกว่า 10 ชั่วโมง/สัปดาห์",
+        }
+        studytime_txt = c5.selectbox("เวลาที่ใช้ในการเรียนต่อสัปดาห์", list(study_options.values()), index=0)
+        studytime = [k for k, v in study_options.items() if v == studytime_txt][0]
 
-        c13, c14, c15 = st.columns(3)
-        Walc = c13.selectbox("Walc (1-5)", [1, 2, 3, 4, 5], index=0)
-        nursery_txt = c14.selectbox("nursery", ["yes", "no"], index=0)
-        internet_txt = c15.selectbox("internet", ["yes", "no"], index=0)
+        edu_options = {
+            "-": "-",
+            0: "ไม่มีการศึกษา",
+            1: "ประถมศึกษา",
+            2: "มัธยมต้น",
+            3: "มัธยมปลาย",
+            4: "อุดมศึกษา / มหาวิทยาลัย",
+        }
+        Medu_txt = c6.selectbox("ระดับการศึกษาของแม่", list(edu_options.values()), index=0)
+        Medu = [k for k, v in edu_options.items() if v == Medu_txt][0]
 
-        romantic_txt = st.selectbox("romantic", ["yes", "no"], index=1)
+        Fedu_txt = c7.selectbox("ระดับการศึกษาของพ่อ", list(edu_options.values()), index=0)
+        Fedu = [k for k, v in edu_options.items() if v == Fedu_txt][0]
+
+        c8, c9, c10 = st.columns(3)
+
+        famrel_options = {
+            "-": "-",
+            1: "แย่มาก",
+            2: "ค่อนข้างแย่",
+            3: "ปานกลาง",
+            4: "ค่อนข้างดี",
+            5: "ดีมาก",
+        }
+        famrel_txt = c8.selectbox("ความสัมพันธ์ในครอบครัว", list(famrel_options.values()), index=0)
+        famrel = [k for k, v in famrel_options.items() if v == famrel_txt][0]
+
+        level_options = {
+            "-": "-",
+            1: "ต่ำมาก",
+            2: "ต่ำ",
+            3: "ปานกลาง",
+            4: "สูง",
+            5: "มากที่สุด",
+        }
+        freetime_txt = c9.selectbox("เวลาว่างหลังเลิกเรียน", list(level_options.values()), index=0)
+        freetime = [k for k, v in level_options.items() if v == freetime_txt][0]
+
+        goout_txt = c10.selectbox("ความถี่ในการไปเที่ยวกับเพื่อน", list(level_options.values()), index=0)
+        goout = [k for k, v in level_options.items() if v == goout_txt][0]
+
+        c11, c12, c13 = st.columns(3)
+
+        Dalc_txt = c11.selectbox("การดื่มแอลกอฮอล์ในวันธรรมดา", list(level_options.values()), index=0)
+        Dalc = [k for k, v in level_options.items() if v == Dalc_txt][0]
+
+        Walc_txt = c12.selectbox("การดื่มแอลกอฮอล์ในวันหยุด", list(level_options.values()), index=0)
+        Walc = [k for k, v in level_options.items() if v == Walc_txt][0]
+
+        nursery_txt = c13.selectbox("เคยเรียนอนุบาลหรือไม่", ["-", "yes", "no"], index=0)
+
+        c14, c15 = st.columns(2)
+        internet_txt = c14.selectbox("มี Internet หรือไม่", ["-", "yes", "no"], index=0)
+        romantic_txt = c15.selectbox("มีแฟนหรือไม่", ["-", "yes", "no"], index=0)
+
         st.markdown("</div>", unsafe_allow_html=True)
 
-        submit = st.form_submit_button("🔍 วิเคราะห์ข้อมูลนักเรียน", width="stretch")
+        submit = st.form_submit_button("🔍 วิเคราะห์ข้อมูลนักเรียน", use_container_width=True)
 
     if submit:
         student_data = {
@@ -455,6 +710,9 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         result = predict_single(student_data, subject)
 
         st.divider()
+
+        render_top_risk_factors_ai_style(student_data)
+
         left, right = st.columns([1.05, 1.1], gap="large")
 
         with left:
@@ -477,11 +735,11 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
                 },
                 title={"text": "Predicted G3"}
             ))
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
 
-            c1, c2 = st.columns(2)
-            c1.metric("Subject", result["subject"])
-            c2.metric("Predicted G3", f"{result['predicted_g3']:.2f}")
+            cc1, cc2 = st.columns(2)
+            cc1.metric("Subject", result["subject"])
+            cc2.metric("Predicted G3", f"{result['predicted_g3']:.2f}")
 
             if result["academic_status"] == "Normal":
                 st.success(f"Academic Status: {result['academic_status']}")
@@ -490,6 +748,7 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
             else:
                 st.error(f"Academic Status: {result['academic_status']}")
 
+            st.info(f"Risk Zone: {result['risk_zone']}")
             st.markdown("</div>", unsafe_allow_html=True)
 
         with right:
@@ -518,7 +777,7 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
                         result["risk_probabilities"].get("Low Risk", 0.0),
                     ]
                 })
-                st.bar_chart(prob_df.set_index("Risk"), width="stretch")
+                st.bar_chart(prob_df.set_index("Risk"), use_container_width=True)
 
                 st.write(f"- High Risk: {result['risk_probabilities'].get('High Risk', 0.0):.4f}")
                 st.write(f"- Medium Risk: {result['risk_probabilities'].get('Medium Risk', 0.0):.4f}")
@@ -526,9 +785,8 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ==========================================
-# 10) BATCH MODE
+# 11) BATCH MODE
 # ==========================================
 elif app_mode == "📁 ประเมินยกชั้นเรียน":
     st.markdown(
@@ -557,7 +815,7 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.write("ตัวอย่างข้อมูล")
-        st.dataframe(df.head(), width="stretch")
+        st.dataframe(df.head(), use_container_width=True)
 
         required_cols = set(STEP1_FEATURES)
         missing = [c for c in required_cols if c not in df.columns]
@@ -565,11 +823,7 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
         if missing:
             st.error(f"ไฟล์ขาดคอลัมน์: {missing}")
         else:
-            if "course" not in df.columns:
-                df["course"] = default_subject
-                st.warning(f"ไม่พบคอลัมน์ course, ระบบตั้งค่าเป็น {default_subject} ให้ทั้งหมด")
-
-            if st.button("🚀 เริ่มวิเคราะห์", width="stretch"):
+            if st.button("🚀 เริ่มวิเคราะห์", use_container_width=True):
                 result_df = predict_batch(df)
 
                 st.divider()
@@ -589,10 +843,10 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
                     "Risk_Label": ["Low Risk", "Medium Risk", "High Risk"],
                     "Count": [int(low_count), int(medium_count), int(high_count)]
                 })
-                st.bar_chart(summary_df.set_index("Risk_Label"), width="stretch")
+                st.bar_chart(summary_df.set_index("Risk_Label"), use_container_width=True)
 
                 st.subheader("ผลลัพธ์รายคน")
-                st.dataframe(result_df, width="stretch")
+                st.dataframe(result_df, use_container_width=True)
 
                 csv_data = result_df.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
