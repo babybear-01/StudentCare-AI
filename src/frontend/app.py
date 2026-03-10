@@ -12,12 +12,12 @@ from io import BytesIO
 # ==========================================
 # 1) PAGE CONFIG
 # ==========================================
-st.set_page_config(
-    page_title="StudentCare-AI | Student Risk Analysis",
-    page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="StudentCare-AI", layout="wide")
+
+# Session State
+if "student_data" not in st.session_state: st.session_state.student_data = None
+if "result" not in st.session_state: st.session_state.result = None
+if "ai_summary" not in st.session_state: st.session_state.ai_summary = None
 
 # ==========================================
 # 1.1) SESSION STATE
@@ -647,8 +647,7 @@ def generate_ai_summary(student_data: dict, result: dict):
 
     client = load_gemini_client()
 
-    if client is None:
-        return "ไม่พบ Gemini API Key"
+    if not client: return "API Error"
 
      # ✅ สร้าง factor_text ก่อนใช้
     top_factors = get_top_risk_factors(student_data)
