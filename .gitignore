@@ -25,5 +25,5 @@ logs/
 # Jupyter
 .ipynb_checkpoints/
 
-#APi
-.streamlit/
+#API
+.streamlit/secrets.toml
