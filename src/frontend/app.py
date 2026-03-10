@@ -308,7 +308,7 @@ STEP1_DEFAULTS = {
 # ==========================================
 # 7) LOAD MODELS
 # ==========================================
-@st.cache_resource
+@st.cache
 def load_step1_model(subject: str):
     if subject == "math":
         if not MATH_STEP1_MODEL_PATH.exists():
@@ -323,7 +323,7 @@ def load_step1_model(subject: str):
     raise ValueError("subject must be 'math' or 'por'")
 
 
-@st.cache_resource
+@st.cache
 def load_step2_model(subject: str):
     if subject == "math":
         if not MATH_STEP2_MODEL_PATH.exists():
