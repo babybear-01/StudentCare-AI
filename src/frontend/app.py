@@ -341,7 +341,7 @@ def load_step2_model(subject: str):
 # ==========================================
 # 7B) LOAD GEMINI
 # ==========================================
-@st.cache_resource
+@st.cache
 def load_gemini_client():
 
     api_key = st.secrets["general"]["GENAI_API_KEY"]
