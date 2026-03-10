@@ -203,7 +203,6 @@ if PROJECT_ROOT is None:
 MATH_STEP1_MODEL_PATH = (
     PROJECT_ROOT
     / "StudentCare-AI"
-    / "StudentCare-AI"
     / "src"
     / "modelv2"
     / "Weight_feature_mat_2_1"
@@ -212,7 +211,6 @@ MATH_STEP1_MODEL_PATH = (
 
 POR_STEP1_MODEL_PATH = (
     PROJECT_ROOT
-    / "StudentCare-AI"
     / "StudentCare-AI"
     / "src"
     / "modelv2"
