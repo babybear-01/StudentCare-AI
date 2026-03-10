@@ -1,3 +1,4 @@
+from google import genai
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -14,6 +15,19 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ==========================================
+# 1.1) SESSION STATE
+# ==========================================
+if "student_data" not in st.session_state:
+    st.session_state.student_data = None
+
+if "result" not in st.session_state:
+    st.session_state.result = None
+
+if "ai_summary" not in st.session_state:
+    st.session_state.ai_summary = None
+
 
 # ==========================================
 # 2) CUSTOM CSS
@@ -320,6 +334,23 @@ def load_step2_model(subject: str):
 
     raise ValueError("subject must be 'math' or 'por'")
 
+
+# ==========================================
+# 7B) LOAD GEMINI
+# ==========================================
+@st.cache_resource
+def load_gemini_client():
+
+    api_key = st.secrets.get("GEMINI_API_KEY", None)
+
+    if not api_key:
+        return None
+
+    client = genai.Client(api_key=api_key)
+
+    return client
+
+
 # ==========================================
 # 8) BUSINESS LOGIC
 # ==========================================
@@ -344,14 +375,20 @@ def create_risk_zone(predicted_g3: float) -> str:
         return "Medium Risk Zone"
     return "Low Risk Zone"
 
-
 def preprocess_step1_input(student_data: dict) -> dict:
     processed = {}
 
     for key, value in student_data.items():
         processed[key] = normalize_optional_value(value)
 
-    binary_map = {"yes": 1, "no": 0, 1: 1, 0: 0}
+    binary_map = {
+        "ใช่": 1,
+        "ไม่ใช่": 0,
+        "มี": 1,
+        "ไม่มี": 0,
+        1: 1,
+        0: 0,
+    }
 
     for col in ["nursery", "internet", "romantic"]:
         if col in processed and not pd.isna(processed[col]):
@@ -359,10 +396,19 @@ def preprocess_step1_input(student_data: dict) -> dict:
 
     return processed
 
+def coerce_numeric_or_nan(value):
+    value = normalize_optional_value(value)
+    if pd.isna(value):
+        return np.nan
+    try:
+        return float(value)
+    except Exception:
+        return np.nan
+
 
 def prepare_step1_input(student_data: dict) -> pd.DataFrame:
     step1_input = preprocess_step1_input(student_data)
-    row = []
+    row = {}
 
     for col in STEP1_FEATURES:
         val = step1_input.get(col, np.nan)
@@ -370,10 +416,18 @@ def prepare_step1_input(student_data: dict) -> pd.DataFrame:
         if pd.isna(val):
             val = STEP1_DEFAULTS.get(col, 0)
 
-        row.append(val)
+        row[col] = val
 
-    return pd.DataFrame([row], columns=STEP1_FEATURES)
+    step1_df = pd.DataFrame([row], columns=STEP1_FEATURES)
 
+    for col in STEP1_FEATURES:
+        step1_df[col] = pd.to_numeric(step1_df[col], errors="coerce")
+
+    for col in STEP1_FEATURES:
+        if step1_df[col].isna().any():
+            step1_df[col] = step1_df[col].fillna(STEP1_DEFAULTS.get(col, 0))
+
+    return step1_df
 
 def prepare_step2_input(student_data: dict) -> pd.DataFrame:
     row = []
@@ -576,12 +630,74 @@ def predict_batch(df: pd.DataFrame, default_subject: str = "math"):
     result_df = result_df.loc[:, ~result_df.columns.duplicated()]
     return result_df
 
+
+def generate_ai_summary(student_data: dict, result: dict):
+
+    client = load_gemini_client()
+
+    if client is None:
+        return "ไม่พบ Gemini API Key"
+
+     # ✅ สร้าง factor_text ก่อนใช้
+    top_factors = get_top_risk_factors(student_data)
+    factor_text = ", ".join([label for _, label, _ in top_factors]) if top_factors else "ไม่พบปัจจัยเสี่ยงเด่นชัด"
+
+    prompt = f"""
+วิเคราะห์ความเสี่ยงทางการเรียนของนักเรียนเพื่อช่วยให้อาจารย์ติดตามผลการเรียน
+
+ห้ามแต่งข้อมูลเพิ่ม ให้ใช้เฉพาะข้อมูลที่ให้
+
+Student Data
+G1: {student_data.get("G1")}
+G2: {student_data.get("G2")}
+Failures: {student_data.get("failures")}
+Absences: {student_data.get("absences")}
+StudyTime: {student_data.get("studytime")}
+GoOut: {student_data.get("goout")}
+
+Model Result
+Predicted G3: {result.get("predicted_g3")}
+Risk Level: {result.get("risk_label")}
+
+Top Factors
+{factor_text}
+
+ตอบเป็นภาษาไทย กระชับ ไม่เกิน 6 บรรทัด
+
+รูปแบบคำตอบ:
+
+📊 ภาพรวมผลการเรียน:
+<คำอธิบาย>
+
+⚠️ ปัจจัยเสี่ยงสำคัญ:
+<คำอธิบาย>
+
+👩‍🏫 ข้อเสนอแนะสำหรับอาจารย์:
+<คำอธิบาย>
+"""
+
+    try:
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+
+        return response.text
+
+    except Exception as e:
+
+        return f"Gemini error: {e}"
+    
+
+
+
 # ==========================================
 # 9) SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("🎓 StudentCare-AI")
-    st.markdown("ระบบทำนาย G3 และจัดระดับความเสี่ยงของนักเรียน")
+    st.markdown("ระบบทำนายคะแนนสอบปลายภาค(G3)และจัดระดับความเสี่ยงของนักเรียนแบบรายบุคคลและแบบยกชั้นเรียน")
     st.divider()
 
     app_mode = st.radio(
@@ -601,7 +717,7 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         <div class="hero-box">
             <div class="hero-title">🎓 Student Risk Analyzer</div>
             <div class="hero-subtitle">
-                กรอกข้อมูลนักเรียนเพื่อทำนายคะแนน G3 และประเมินระดับความเสี่ยงแบบรายบุคคล
+                กรอกข้อมูลนักเรียนเพื่อทำนายคะแนนสอบปลายภาค(G3)และประเมินระดับความเสี่ยงแบบรายบุคคล
             </div>
         </div>
         """,
@@ -695,11 +811,11 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         Walc_txt = c12.selectbox("การดื่มแอลกอฮอล์ในวันหยุด", list(level_options.values()), index=0)
         Walc = [k for k, v in level_options.items() if v == Walc_txt][0]
 
-        nursery_txt = c13.selectbox("เคยเรียนอนุบาลหรือไม่", ["-", "yes", "no"], index=0)
+        nursery_txt = c13.selectbox("เคยเรียนอนุบาลหรือไม่", ["-", "ใช่", "ไม่ใช่"], index=0)
 
         c14, c15 = st.columns(2)
-        internet_txt = c14.selectbox("มี Internet หรือไม่", ["-", "yes", "no"], index=0)
-        romantic_txt = c15.selectbox("มีแฟนหรือไม่", ["-", "yes", "no"], index=0)
+        internet_txt = c14.selectbox("มี Internet หรือไม่", ["-", "มี", "ไม่มี"], index=0)
+        romantic_txt = c15.selectbox("มีแฟนหรือไม่", ["-", "มี", "ไม่มี"], index=0)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -725,9 +841,14 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         }
 
         result = predict_single(student_data, subject)
+        st.session_state.student_data = student_data
+        st.session_state.result = result
+        st.session_state.ai_summary = None
+    if st.session_state.result is not None:
+        student_data = st.session_state.student_data
+        result = st.session_state.result
 
         st.divider()
-
         render_top_risk_factors_ai_style(student_data)
 
         left, right = st.columns([1.05, 1.1], gap="large")
@@ -801,6 +922,15 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
                 st.write(f"- Low Risk: {result['risk_probabilities'].get('Low Risk', 0.0):.4f}")
 
             st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("✨ AI วิเคราะห์เพิ่มเติม", use_container_width=True):
+                with st.spinner("กำลังให้ AI วิเคราะห์..."):
+                    st.session_state.ai_summary = generate_ai_summary(student_data, result)
+
+            if st.session_state.ai_summary:
+                st.markdown('<div class="result-card">', unsafe_allow_html=True)
+                st.subheader("AI Summary & Recommendations")
+                st.markdown(st.session_state.ai_summary)
+                st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
 # 11) BATCH MODE
