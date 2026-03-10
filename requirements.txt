@@ -1,14 +1,38 @@
-pandas=2.2.0
-numpy=1.26.4
-scikit-learn=1.2.2
-matplotlib
-joblib=1.3.2
-pyyaml
-fastapi
-uvicorn
-streamlit
-shap
-mlflow
-pydantic
-requests
-plotly
+# pandas=2.2.0
+# numpy=1.26.4
+# scikit-learn=1.2.2
+# matplotlib
+# joblib=1.3.2
+# pyyaml
+# fastapi
+# uvicorn
+# streamlit
+# shap
+# mlflow
+# pydantic
+# requests
+# plotly
+
+# Core Libraries
+streamlit==1.55.0
+pandas==2.3.3
+numpy==2.0.0
+scikit-learn==1.2.2
+joblib==1.3.2
+scipy==1.15.0
+
+# MLflow & Backend
+mlflow==3.10.1
+fastapi==0.135.1
+uvicorn==0.41.0
+requests==2.32.5
+pydantic==2.12.5
+
+# Visualization & Others
+plotly==6.6.0
+matplotlib==3.10.8
+altair==6.0.0
+shap==0.51.0
+google-generativeai==0.8.4
+google-generativeai==0.8.4
+pyyaml==6.0.1
