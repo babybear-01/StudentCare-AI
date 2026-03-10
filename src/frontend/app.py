@@ -831,7 +831,7 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-        submit = st.form_submit_button("🔍 วิเคราะห์ข้อมูลนักเรียน", use_container_width=True)
+        submit = st.form_submit_button("🔍 วิเคราะห์ข้อมูลนักเรียน")
 
     if submit:
         student_data = {
@@ -988,7 +988,7 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
         if missing:
             st.error(f"ไฟล์ขาดคอลัมน์: {missing}")
         else:
-            if st.button("🚀 เริ่มวิเคราะห์", use_container_width=True):
+            if st.button("🚀 เริ่มวิเคราะห์"):
                 result_df = predict_batch(df, default_subject=default_subject)
 
                 st.markdown("---")
