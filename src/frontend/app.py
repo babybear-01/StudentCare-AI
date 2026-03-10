@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import joblib
 import numpy as np
 from pathlib import Path
+from io import BytesIO
 
 # ==========================================
 # 1) PAGE CONFIG
@@ -349,6 +350,17 @@ def load_gemini_client():
     client = genai.Client(api_key=api_key)
 
     return client
+
+# ==========================================
+# 7C) CACHE CSV READER (STABLE)
+# ==========================================
+@st.cache_data(show_spinner=False)
+def read_uploaded_csv_cached(file_bytes: bytes) -> pd.DataFrame:
+    """
+    อ่าน CSV จาก bytes เพื่อให้ cache เสถียรกว่าใช้ uploaded_file object ตรง ๆ
+    """
+    df = pd.read_csv(BytesIO(file_bytes))
+    return df
 
 
 # ==========================================
@@ -922,14 +934,15 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
                 st.write(f"- Low Risk: {result['risk_probabilities'].get('Low Risk', 0.0):.4f}")
 
             st.markdown("</div>", unsafe_allow_html=True)
-            if st.button("✨ AI วิเคราะห์เพิ่มเติม", use_container_width=True):
+            if st.button("✨ ขอสรุปผลและคำแนะนำเพิ่มเติม", use_container_width=True):
                 with st.spinner("กำลังให้ AI วิเคราะห์..."):
                     st.session_state.ai_summary = generate_ai_summary(student_data, result)
 
             if st.session_state.ai_summary:
                 st.markdown('<div class="result-card">', unsafe_allow_html=True)
-                st.subheader("AI Summary & Recommendations")
-                st.markdown(st.session_state.ai_summary)
+                st.subheader("สรุปผลและคำแนะจาก AI")
+                formatted_summary = st.session_state.ai_summary.replace("\n", "<br>")
+                st.markdown(formatted_summary, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
@@ -961,6 +974,11 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+
+        @st.cache_data
+        def read_uploaded_csv(uploaded_file):
+            df = pd.read_csv(uploaded_file)
+            return df
         st.write("ตัวอย่างข้อมูล")
         st.dataframe(df.head(), use_container_width=True)
 

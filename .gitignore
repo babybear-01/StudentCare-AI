@@ -24,3 +24,6 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+#APi
+.streamlit/
