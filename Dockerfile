@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src ./src
 COPY data ./data
 
-EXPOSE 8000
+# เปิดพอร์ตที่ใช้สำหรับ Streamlit
 EXPOSE 8501
 
-CMD ["python", "-m", "src.models.train"]
+# กำหนดคำสั่งที่จะรันแอป Streamlit
+CMD ["streamlit", "run", "src/frontend/app.py"]
