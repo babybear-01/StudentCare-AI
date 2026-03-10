@@ -1,4 +1,4 @@
-from google import genai
+from google import generativeai as genai
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -308,7 +308,7 @@ STEP1_DEFAULTS = {
 # ==========================================
 # 7) LOAD MODELS
 # ==========================================
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_step1_model(subject: str):
     if subject == "math":
         if not MATH_STEP1_MODEL_PATH.exists():
@@ -323,7 +323,7 @@ def load_step1_model(subject: str):
     raise ValueError("subject must be 'math' or 'por'")
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_step2_model(subject: str):
     if subject == "math":
         if not MATH_STEP2_MODEL_PATH.exists():
@@ -341,19 +341,12 @@ def load_step2_model(subject: str):
 # ==========================================
 # 7B) LOAD GEMINI
 # ==========================================
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_gemini_client():
-
-    api_key = st.secrets["general"]["GENAI_API_KEY"]
-
-    if not api_key:
-        st.error("API key not found in secrets.")
-        return None
-
     try:
-        # สร้าง client สำหรับเชื่อมต่อกับ Gemini API
-        client = genai.Client(api_key=api_key)
-        return client
+        api_key = st.secrets["general"]["GENAI_API_KEY"]
+        genai.configure(api_key=api_key)
+        return genai # คืนค่าโมดูลที่ config แล้ว
     except Exception as e:
         st.error(f"Error loading Gemini client: {e}")
         return None
@@ -361,7 +354,7 @@ def load_gemini_client():
 # ==========================================
 # 7C) CACHE CSV READER (STABLE)
 # ==========================================
-@st.cache(show_spinner=False)
+@st.experimental_memo
 def read_uploaded_csv_cached(file_bytes: bytes) -> pd.DataFrame:
     """
     อ่าน CSV จาก bytes เพื่อให้ cache เสถียรกว่าใช้ uploaded_file object ตรง ๆ
