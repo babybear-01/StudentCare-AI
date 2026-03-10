@@ -724,7 +724,7 @@ with st.sidebar:
         ["👤 วิเคราะห์รายบุคคล", "📁 ประเมินยกชั้นเรียน"]
     )
 
-    st.divider()
+    st.markdown("---")
     st.caption("KMITL Student Project")
 
 # ==========================================
@@ -867,7 +867,7 @@ if app_mode == "👤 วิเคราะห์รายบุคคล":
         student_data = st.session_state.student_data
         result = st.session_state.result
 
-        st.divider()
+        st.markdown("---")
         render_top_risk_factors_ai_style(student_data)
 
         left, right = st.columns([1.05, 1.1], gap="large")
@@ -998,7 +998,7 @@ elif app_mode == "📁 ประเมินยกชั้นเรียน":
             if st.button("🚀 เริ่มวิเคราะห์", use_container_width=True):
                 result_df = predict_batch(df, default_subject=default_subject)
 
-                st.divider()
+                st.markdown("---")
                 st.subheader("สรุปผล")
 
                 low_count = (result_df["Risk_Label"] == "Low Risk").sum()
