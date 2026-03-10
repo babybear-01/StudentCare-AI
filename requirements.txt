@@ -13,3 +13,4 @@ pydantic
 requests
 plotly
 altair==4.2.0
+genai
