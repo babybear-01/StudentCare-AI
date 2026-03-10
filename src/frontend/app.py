@@ -361,7 +361,7 @@ def load_gemini_client():
 # ==========================================
 # 7C) CACHE CSV READER (STABLE)
 # ==========================================
-@st.cache_data(show_spinner=False)
+@st.cache(show_spinner=False)
 def read_uploaded_csv_cached(file_bytes: bytes) -> pd.DataFrame:
     """
     อ่าน CSV จาก bytes เพื่อให้ cache เสถียรกว่าใช้ uploaded_file object ตรง ๆ
