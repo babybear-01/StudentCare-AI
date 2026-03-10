@@ -206,7 +206,7 @@ MATH_STEP1_MODEL_PATH = (
     / "src"
     / "modelv2"
     / "Weight_feature_mat_2_1"
-    / "student_model_v2.pkl"
+    / "student_model_v2_1.pkl"
 )
 
 POR_STEP1_MODEL_PATH = (
@@ -215,7 +215,7 @@ POR_STEP1_MODEL_PATH = (
     / "src"
     / "modelv2"
     / "Weight_feature_por_2_1"
-    / "student_model_v2.pkl"
+    / "student_model_v2_1.pkl"
 )
 
 # Step 2B models (predict risk label)
