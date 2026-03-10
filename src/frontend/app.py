@@ -204,18 +204,16 @@ MATH_STEP1_MODEL_PATH = (
     PROJECT_ROOT
     / "StudentCare-AI"
     / "src"
-    / "modelv2"
-    / "Weight_feature_mat_2_1"
-    / "student_model_v2_1.pkl"
+    / "Weight_feature_mat_2_3"
+    / "student_model_v2_3.pkl"
 )
 
 POR_STEP1_MODEL_PATH = (
     PROJECT_ROOT
     / "StudentCare-AI"
     / "src"
-    / "modelv2"
-    / "Weight_feature_por_2_1"
-    / "student_model_v2_1.pkl"
+    / "Weight_feature_por_2_3"
+    / "student_model_v2_3.pkl"
 )
 
 # Step 2B models (predict risk label)
@@ -304,7 +302,7 @@ STEP1_DEFAULTS = {
 # ==========================================
 # 7) LOAD MODELS
 # ==========================================
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_step1_model(subject: str):
     if subject == "math":
         if not MATH_STEP1_MODEL_PATH.exists():
@@ -319,7 +317,7 @@ def load_step1_model(subject: str):
     raise ValueError("subject must be 'math' or 'por'")
 
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_step2_model(subject: str):
     if subject == "math":
         if not MATH_STEP2_MODEL_PATH.exists():
@@ -337,7 +335,7 @@ def load_step2_model(subject: str):
 # ==========================================
 # 7B) LOAD GEMINI
 # ==========================================
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_gemini_client():
     try:
         api_key = st.secrets["general"]["GENAI_API_KEY"]
@@ -346,17 +344,6 @@ def load_gemini_client():
     except Exception as e:
         st.error(f"Error loading Gemini client: {e}")
         return None
-
-# ==========================================
-# 7C) CACHE CSV READER (STABLE)
-# ==========================================
-@st.experimental_memo
-def read_uploaded_csv_cached(file_bytes: bytes) -> pd.DataFrame:
-    """
-    อ่าน CSV จาก bytes เพื่อให้ cache เสถียรกว่าใช้ uploaded_file object ตรง ๆ
-    """
-    df = pd.read_csv(BytesIO(file_bytes))
-    return df
 
 
 # ==========================================
