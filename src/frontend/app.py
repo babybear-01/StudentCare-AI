@@ -717,7 +717,7 @@ Top Factors
 with st.sidebar:
     st.title("🎓 StudentCare-AI")
     st.markdown("ระบบทำนายคะแนนสอบปลายภาค(G3)และจัดระดับความเสี่ยงของนักเรียนแบบรายบุคคลและแบบยกชั้นเรียน")
-    st.divider()
+    st.markdown("---")
 
     app_mode = st.radio(
         "เลือกโหมดการทำงาน",
