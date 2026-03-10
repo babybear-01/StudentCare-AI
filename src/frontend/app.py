@@ -7,6 +7,8 @@ import numpy as np
 from pathlib import Path
 from io import BytesIO
 
+
+
 # ==========================================
 # 1) PAGE CONFIG
 # ==========================================
@@ -342,14 +344,19 @@ def load_step2_model(subject: str):
 @st.cache_resource
 def load_gemini_client():
 
-    api_key = st.secrets.get("GEMINI_API_KEY", None)
+    api_key = st.secrets["general"]["GENAI_API_KEY"]
 
     if not api_key:
+        st.error("API key not found in secrets.")
         return None
 
-    client = genai.Client(api_key=api_key)
-
-    return client
+    try:
+        # สร้าง client สำหรับเชื่อมต่อกับ Gemini API
+        client = genai.Client(api_key=api_key)
+        return client
+    except Exception as e:
+        st.error(f"Error loading Gemini client: {e}")
+        return None
 
 # ==========================================
 # 7C) CACHE CSV READER (STABLE)
