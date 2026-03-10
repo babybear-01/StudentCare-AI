@@ -1,4 +1,4 @@
-pandas==1.4.2
+pandas==1.3.3
 numpy==1.23.1
 scikit-learn==1.1.0
 matplotlib
@@ -12,3 +12,4 @@ mlflow
 pydantic
 requests
 plotly
+altair==4.2.0
