@@ -2,15 +2,15 @@ version: "3.9"
 
 services:
 
-  mlflow-ui:
+  mlflow:
     image: ghcr.io/mlflow/mlflow:latest
-    container_name: mlflow-ui
     ports:
-      - "5000:5000"
+      - "5005:5000"
+    # เพิ่มการระบุ sqlite เพื่อความถาวรของข้อมูล metadata
+    command: mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/mlruns --host 0.0.0.0
     volumes:
-      - ./mlruns:/app/mlruns
-      - ./mlflow.db:/app/mlflow.db
-    command: mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root /app/mlruns --host 0.0.0.0
+      - ./mlruns:/mlflow/mlruns
+      - ./mlflow.db:/mlflow/mlflow.db # เชื่อม DB ไว้ที่นี่
 
   studentcare-api:
     build: .

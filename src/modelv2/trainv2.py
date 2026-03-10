@@ -35,12 +35,12 @@ X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
 # 5. กำหนดค่าสำหรับ Save Model ลงเครื่อง
-MODEL_DIR = "StudentCare-AI\src\modelv2\Weight_feature_por_2"
+MODEL_DIR = "StudentCare-AI\src\modelv2\Weight_feature_por_2_1"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # 6. ตั้งค่า MLflow และรันการเทรน
-mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment("Weight_feature_por_v2")
+mlflow.set_tracking_uri("http://localhost:5005")
+mlflow.set_experiment("Weight_feature_por_v2_1")
 
 with mlflow.start_run():
     # เทรนโมเดล
@@ -71,7 +71,7 @@ with mlflow.start_run():
 
     # บันทึกโมเดล
     mlflow.sklearn.log_model(model, "student_performance_model")
-    joblib.dump(model, os.path.join(MODEL_DIR, "student_model_v2.pkl"))
+    joblib.dump(model, os.path.join(MODEL_DIR, "student_model_v2_1.pkl"), protocol=4)
     
     print(f"\nTraining Complete!")
     print(f"Validation R2: {val_r2:.4f}")
