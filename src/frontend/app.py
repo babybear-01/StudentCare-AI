@@ -204,6 +204,7 @@ MATH_STEP1_MODEL_PATH = (
     PROJECT_ROOT
     / "StudentCare-AI"
     / "src"
+    / "modelv2"
     / "Weight_feature_mat_2_3"
     / "student_model_v2_3.pkl"
 )
@@ -212,6 +213,7 @@ POR_STEP1_MODEL_PATH = (
     PROJECT_ROOT
     / "StudentCare-AI"
     / "src"
+    / "modelv2"
     / "Weight_feature_por_2_3"
     / "student_model_v2_3.pkl"
 )
