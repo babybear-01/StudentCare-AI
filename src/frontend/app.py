@@ -202,7 +202,7 @@ if PROJECT_ROOT is None:
 # Step 1 models (predict G3)
 MATH_STEP1_MODEL_PATH = (
     PROJECT_ROOT
-    / "StudentCare-AI"
+    / "StudentCare-AI_1"
     / "src"
     / "modelv2"
     / "Weight_feature_mat_2_3"
@@ -211,7 +211,7 @@ MATH_STEP1_MODEL_PATH = (
 
 POR_STEP1_MODEL_PATH = (
     PROJECT_ROOT
-    / "StudentCare-AI"
+    / "StudentCare-AI_1"
     / "src"
     / "modelv2"
     / "Weight_feature_por_2_3"
